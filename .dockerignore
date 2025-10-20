@@ -1,0 +1,8 @@
+vendor
+node_modules
+.git
+.env
+docker-compose.override.yml
+*.log
+/.idea
+/.vscode

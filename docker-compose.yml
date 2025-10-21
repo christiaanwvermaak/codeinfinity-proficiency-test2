@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   web:
     build: .
     ports:
       - "8080:80"
     volumes:
-      - ./:/var/www/html:delegated
+      - ./app:/var/www/html:delegated
     environment:
       - APACHE_RUN_USER=www-data
       - APACHE_RUN_GROUP=www-data

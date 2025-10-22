@@ -23,6 +23,9 @@ RUN if [ -f /var/www/html/composer.json ]; then composer install --no-interactio
 COPY httpd.conf /etc/apache2/conf-available/httpd.conf
 RUN a2enconf httpd
 
+# Copy custom PHP ini overrides
+COPY php/conf/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 
 # Remove any conf.d ini files that would load PDO extensions
 RUN rm -f /usr/local/etc/php/conf.d/*pdo*.ini || true

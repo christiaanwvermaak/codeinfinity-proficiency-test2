@@ -13,7 +13,7 @@
     <?php include __DIR__ . '/_nav.php'; ?>
 
     <div style="padding-top:18px;max-width:720px;margin:18px auto;">
-      <form class="card" action="generate.php" method="post" onsubmit="return onSubmitForm()">
+  <form id="generateForm" class="card" action="generate.php" method="post" onsubmit="return onSubmitForm()">
         <h1>Generate CSV</h1>
         <p class="lead">Enter how many persons you want to generate and download as a CSV file.</p>
 
@@ -27,7 +27,8 @@
         </div>
 
         <div class="footer">CSV will be generated on the server and downloaded to your browser.</div>
-      </form>
+  </form>
+  <div id="resultArea" style="margin-top:18px;"></div>
 
       
     </div>
@@ -56,8 +57,76 @@
         overlay.style.display = 'flex';
         overlay.setAttribute('aria-hidden', 'false');
         document.querySelectorAll('button').forEach(b=>b.disabled = true);
-        return true; // allow form to submit
+          // instead of submitting, create job via AJAX and run worker
+          createAndStartJob();
+          return false;
       }
+
+        async function createAndStartJob(){
+          const count = Number(document.getElementById('count').value || 0);
+          const resultArea = document.getElementById('resultArea');
+          const loadingText = document.getElementById('loadingText');
+          loadingText.textContent = 'Queuing job...';
+
+          // create job
+          const form = new FormData();
+          form.append('count', String(count));
+          let createResp;
+          try {
+            createResp = await fetch('create_job.php', { method: 'POST', body: form });
+            createResp = await createResp.json();
+          } catch (err) {
+            loadingText.textContent = 'Failed to create job: ' + err.message;
+            document.querySelectorAll('button').forEach(b=>b.disabled = false);
+            return;
+          }
+
+          if (!createResp.ok) {
+            loadingText.textContent = 'Create job failed: ' + (createResp.error || 'unknown');
+            document.querySelectorAll('button').forEach(b=>b.disabled = false);
+            return;
+          }
+
+          loadingText.textContent = 'Starting worker...';
+
+          // start worker
+          let startResp;
+          try {
+            startResp = await fetch('start_job.php', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ job: createResp.job })
+            });
+            startResp = await startResp.json();
+          } catch (err) {
+            loadingText.textContent = 'Failed to start worker: ' + err.message;
+            document.querySelectorAll('button').forEach(b=>b.disabled = false);
+            return;
+          }
+
+          if (!startResp.ok) {
+            loadingText.textContent = 'Worker start failed: ' + (startResp.error || 'unknown');
+            document.querySelectorAll('button').forEach(b=>b.disabled = false);
+            return;
+          }
+
+          loadingText.textContent = 'Generating — this may take a while...';
+
+          // poll for file
+          const outUrl = createResp.out_url;
+          while (true) {
+            try {
+              const r = await fetch(outUrl, { method: 'HEAD' });
+              if (r.status === 200) break;
+            } catch (e) {}
+            await new Promise(r=>setTimeout(r, 1500));
+          }
+
+          // show download
+          loadingText.textContent = 'Generation complete';
+          resultArea.innerHTML = '<div class="card"><h2>Download</h2><p><a class="btn primary" href="' + createResp.out_url + '" download>Download CSV</a></p><p>Log: <a href="' + createResp.job_web + '.log">View log</a></p></div>';
+          document.querySelectorAll('button').forEach(b=>b.disabled = false);
+        }
 
       // upload handling moved to /upload_page.php
     </script>

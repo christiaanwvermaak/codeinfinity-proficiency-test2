@@ -52,7 +52,8 @@ if (!is_dir($jobsDir)) mkdir($jobsDir, 0755, true);
 
 $job = [
     'count' => $count,
-    'output' => 'output/output.csv',
+    // use unique per-job output to avoid collisions
+    'output' => 'output/output_' . time() . '_' . bin2hex(random_bytes(4)) . '.csv',
     'first_names' => $first_names,
     'last_names' => $last_names,
     'created_at' => (new DateTimeImmutable())->format(DateTime::ATOM),
@@ -65,11 +66,81 @@ file_put_contents($jobFile, json_encode($job, JSON_PRETTY_PRINT | JSON_UNESCAPED
 // Instead, return the queued page and show the exact CLI command to run the worker for this job.
 $relativePath = 'output/output.csv';
 $displayJob = basename($jobFile);
-$phpBin = defined('PHP_BINARY') ? PHP_BINARY : 'php';
-$cliScript = __DIR__ . '/generate_cli.php';
-$exampleCmd = $phpBin . ' ' . $cliScript . ' --job ' . $jobFile;
+$outRel = $job['output'];
+$outUrl = '/' . ltrim($outRel, '/');
 
-echo "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Job queued</title></head>\n<body style=\"font-family:Arial,Helvetica,sans-serif;padding:24px;max-width:680px;margin:auto;\">";
+echo "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Job queued</title></head>\n<body style=\"font-family:Inter,system-ui,Arial,Helvetica,sans-serif;padding:24px;max-width:680px;margin:auto;\">";
 include __DIR__ . '/_nav.php';
-echo "\n  <h1>Job queued</h1>\n  <p>Your generation job has been queued. To run jobs, execute the CLI worker with the command below (on the host/container):</p>\n  <pre style=\"background:#0b1220;padding:12px;border-radius:8px;color:#cfeaf6;\">" . htmlspecialchars($exampleCmd, ENT_QUOTES, 'UTF-8') . "</pre>\n  <ul>\n    <li>Job file: <a href=\"/output/jobs/" . htmlspecialchars($displayJob, ENT_QUOTES, 'UTF-8') . "\">" . htmlspecialchars($displayJob, ENT_QUOTES, 'UTF-8') . "</a></li>\n    <li>Expected CSV (when ready): <a href=\"/".htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8')."\">output.csv</a></li>\n  </ul>\n  <p><a href=\"/\">Back</a></p>\n</body>\n</html>";
+?>
+
+    <h1>Job queued</h1>
+    <p>Your generation job has been queued. It will be started automatically and this page will show a download link when the CSV is ready.</p>
+    <ul>
+        <li>Job file: <a id="jobLink" href="/output/jobs/<?php echo htmlspecialchars(basename($jobFile), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(basename($jobFile), ENT_QUOTES, 'UTF-8'); ?></a></li>
+        <li id="statusItem">Status: <em>queued</em></li>
+    </ul>
+    <div id="downloadArea"></div>
+    <p><a href="/">Back</a></p>
+
+    <script>
+        const JOB_FILE = <?php echo json_encode($jobFile, JSON_UNESCAPED_SLASHES); ?>;
+        const JOB_WEB = <?php echo json_encode('/output/jobs/' . basename($jobFile), JSON_UNESCAPED_SLASHES); ?>;
+        const OUT_URL = <?php echo json_encode($outUrl, JSON_UNESCAPED_SLASHES); ?>;
+
+        async function startJob() {
+            const res = await fetch('start_job.php', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ job: JOB_FILE })
+            });
+            return res.json();
+        }
+
+        async function fileExists(url) {
+            try {
+                const r = await fetch(url, { method: 'HEAD' });
+                return r.status === 200;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        (async function(){
+            const statusEl = document.getElementById('statusItem');
+            const downloadArea = document.getElementById('downloadArea');
+            statusEl.innerHTML = 'Status: <em>starting</em>';
+
+            let info;
+            try {
+                info = await startJob();
+            } catch (err) {
+                statusEl.innerHTML = 'Status: <em>error</em>';
+                downloadArea.innerHTML = '<p style="color:salmon">Failed to start job: ' + String(err) + '</p>';
+                return;
+            }
+
+            if (!info || !info.ok) {
+                statusEl.innerHTML = 'Status: <em>failed</em>';
+                downloadArea.innerHTML = '<p style="color:salmon">Start failed: ' + (info && info.error ? info.error : 'unknown') + '</p>';
+                return;
+            }
+
+            statusEl.innerHTML = 'Status: <em>running (pid ' + (info.pid || 'n/a') + ')</em>';
+
+            // Poll for the file
+            while (true) {
+                if (await fileExists(OUT_URL)) break;
+                await new Promise(r => setTimeout(r, 1500));
+            }
+
+            statusEl.innerHTML = 'Status: <em>completed</em>';
+            downloadArea.innerHTML = '<p><a class="btn primary" href="' + OUT_URL + '" download>Download CSV</a></p>' +
+                '<p>Log: <a href="' + JOB_WEB + '.log">View log</a></p>';
+        })();
+    </script>
+
+</body>
+</html>
+
+<?php
 exit;

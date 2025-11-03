@@ -64,11 +64,10 @@ if ($count < 1 || $count > 4000000) {
 
 $filePath = $appDir . '/' . ltrim($outRel, '/');
 
-$dbPath = $outDir . '/seen.sqlite';
-$db = new SQLite3($dbPath);
-$db->exec('PRAGMA journal_mode = WAL');
-$db->exec('CREATE TABLE IF NOT EXISTS seen(key TEXT PRIMARY KEY)');
-$insertStmt = $db->prepare('INSERT OR IGNORE INTO seen(key) VALUES (:k)');
+// Use in-memory associative array to track seen entries for this run.
+// This ensures duplicates are avoided within a single generate run and
+// the CSV file is overwritten each time because we open with 'w' mode below.
+$seen = [];
 
 // Names pools (default, but may be overridden by job file)
 if ($first_names === null) {
@@ -129,13 +128,12 @@ for ($i=1; $i<=$count; $i++) {
         $age = random_int(18, 90);
         $dob = compute_dob_for_age($age);
 
-        $key = mb_strtolower($first_full, 'UTF-8') . '|' . mb_strtolower($last, 'UTF-8') . '|' . $age . '|' . $dob;
+        // create a deterministic key for this combination (include initials)
+        $key = mb_strtolower($first_full, 'UTF-8') . '|' . mb_strtolower($last, 'UTF-8') . '|' . $initials . '|' . $age . '|' . $dob;
 
-        // attempt to insert; if changes() === 1 it's newly inserted and unique
-        $insertStmt->bindValue(':k', $key, SQLITE3_TEXT);
-        $res = $insertStmt->execute();
-        // sqlite3->changes() indicates whether the insert occurred
-        if ($db->changes() === 1) {
+        // Check in-memory seen array for duplicates for this run
+        if (!array_key_exists($key, $seen)) {
+            $seen[$key] = true;
             $inserted = true;
         }
 
@@ -143,7 +141,7 @@ for ($i=1; $i<=$count; $i++) {
         if ($attempts > $maxAttempts) break;
     } while (!$inserted);
 
-    // write the row regardless (if duplicate case after giving up, it's acceptable)
+    // write the row; if we gave up after attempts, it'll write the last generated values
     fputcsv($out, [$i, $first_full, $last, $initials, $age, $dob], ',', '"', "\\");
 
     // progress indicator for large runs
@@ -153,7 +151,6 @@ for ($i=1; $i<=$count; $i++) {
 }
 
 fclose($out);
-$db->close();
 
 fwrite(STDOUT, "Done. Wrote {$count} rows to {$filePath}\n");
 exit(0);

@@ -32,7 +32,7 @@ if ($fh === false) {
     exit;
 }
 
-$header = fgetcsv($fh);
+$header = fgetcsv($fh, 0, ',', '"', '\\');
 if ($header === false || count($header) === 0) {
     fclose($fh);
     http_response_code(400);
@@ -48,11 +48,46 @@ $cols = array_map(function($c){
     return $c;
 }, $header);
 
+// Ensure column names are unique and do not collide with the auto primary key 'id'
+function uniquify_columns(array $cols): array {
+    $out = [];
+    $seen = [];
+    foreach ($cols as $c) {
+        $name = $c;
+        if (mb_strtolower($name, 'UTF-8') === 'id') {
+            $name = $name . '_col';
+        }
+        $base = $name;
+        $i = 1;
+        while (isset($seen[mb_strtolower($name, 'UTF-8')])) {
+            $name = $base . '_' . $i;
+            $i++;
+        }
+        $seen[mb_strtolower($name, 'UTF-8')] = true;
+        $out[] = $name;
+    }
+    return $out;
+}
+
+$cols = uniquify_columns($cols);
+
 // Create/replace SQLite DB and table
+if (!class_exists('SQLite3')) {
+    http_response_code(500);
+    echo "<p><strong>Server error:</strong> PHP SQLite3 extension is not available.</p>";
+    exit;
+}
+
 if (file_exists($dbPath)) @unlink($dbPath);
-$db = new SQLite3($dbPath);
-$db->exec('PRAGMA synchronous = NORMAL');
-$db->exec('PRAGMA journal_mode = WAL');
+try {
+    $db = new SQLite3($dbPath);
+    $db->exec('PRAGMA synchronous = NORMAL');
+    $db->exec('PRAGMA journal_mode = WAL');
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo "<p><strong>Server error:</strong> Failed to create SQLite DB: " . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . "</p>";
+    exit;
+}
 
 $colsSql = implode(', ', array_map(function($c){ return "\"$c\" TEXT"; }, $cols));
 $create = "CREATE TABLE IF NOT EXISTS csv_import (id INTEGER PRIMARY KEY AUTOINCREMENT, {$colsSql})";
@@ -63,17 +98,25 @@ $insertSql = 'INSERT INTO csv_import (' . implode(',', array_map(function($c){ r
 $stmt = $db->prepare($insertSql);
 
 $rowCount = 0;
-while (($row = fgetcsv($fh)) !== false) {
-    // pad row if short
-    if (count($row) < count($cols)) {
-        $row = array_merge($row, array_fill(0, count($cols) - count($row), null));
+try {
+    while (($row = fgetcsv($fh, 0, ',', '"', '\\')) !== false) {
+        // pad row if short
+        if (count($row) < count($cols)) {
+            $row = array_merge($row, array_fill(0, count($cols) - count($row), null));
+        }
+        // bind values
+        foreach ($row as $i => $v) {
+            $stmt->bindValue($i+1, $v, SQLITE3_TEXT);
+        }
+        $stmt->execute();
+        $rowCount++;
     }
-    // bind values
-    foreach ($row as $i => $v) {
-        $stmt->bindValue($i+1, $v, SQLITE3_TEXT);
-    }
-    $stmt->execute();
-    $rowCount++;
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo "<p><strong>Server error during import:</strong> " . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . "</p>";
+    fclose($fh);
+    if (isset($db)) $db->close();
+    exit;
 }
 
 fclose($fh);

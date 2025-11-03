@@ -3,7 +3,7 @@ FROM php:8.4-apache
 # Install system dependencies and PHP extensions needed for SQLite and Composer
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        libzip-dev zip unzip git curl sqlite3 \
+        libzip-dev zip unzip git curl sqlite3 libsqlite3-dev \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,6 +18,9 @@ COPY composer.json composer.lock* /var/www/html/
 
 # If composer.json exists, install PHP dependencies during build (non-interactive)
 RUN if [ -f /var/www/html/composer.json ]; then composer install --no-interaction --prefer-dist --working-dir=/var/www/html; fi
+
+# Install and enable SQLite extensions for PHP (pdo_sqlite and sqlite3)
+RUN docker-php-ext-install pdo_sqlite sqlite3 || true
 
 # Install and enable custom Apache configuration (httpd.conf)
 COPY httpd.conf /etc/apache2/conf-available/httpd.conf

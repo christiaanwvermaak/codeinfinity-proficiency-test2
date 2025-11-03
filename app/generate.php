@@ -68,8 +68,8 @@ $displayJob = basename($jobFile);
 $phpBin = defined('PHP_BINARY') ? PHP_BINARY : 'php';
 $cliScript = __DIR__ . '/generate_cli.php';
 $exampleCmd = $phpBin . ' ' . $cliScript . ' --job ' . $jobFile;
+$response = `php $exampleCmd`;
 
-echo "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Job queued</title></head>\n<body style=\"font-family:Arial,Helvetica,sans-serif;padding:24px;max-width:680px;margin:auto;\">";
+echo "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Job queued</title>\n<link rel=\"stylesheet\" href=\"styles.css\">\n</head>\n<body class=\"container\">";
 include __DIR__ . '/_nav.php';
-echo "\n  <h1>Job queued</h1>\n  <p>Your generation job has been queued. To run jobs, execute the CLI worker with the command below (on the host/container):</p>\n  <pre style=\"background:#0b1220;padding:12px;border-radius:8px;color:#cfeaf6;\">" . htmlspecialchars($exampleCmd, ENT_QUOTES, 'UTF-8') . "</pre>\n  <ul>\n    <li>Job file: <a href=\"/output/jobs/" . htmlspecialchars($displayJob, ENT_QUOTES, 'UTF-8') . "\">" . htmlspecialchars($displayJob, ENT_QUOTES, 'UTF-8') . "</a></li>\n    <li>Expected CSV (when ready): <a href=\"/".htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8')."\">output.csv</a></li>\n  </ul>\n  <p><a href=\"/\">Back</a></p>\n</body>\n</html>";
-exit;
+echo "\n<div class=\"page-wrap\">\n  <div class=\"card\">\n    <h1>Job queued</h1>\n    <p>Your generation job has been queued.</p>\n    <pre class=\"code-block\">" . htmlspecialchars($exampleCmd, ENT_QUOTES, 'UTF-8') . "</pre>\n    <ul>\n      <li>Job file: <a href=\"/output/jobs/" . htmlspecialchars($displayJob, ENT_QUOTES, 'UTF-8') . "\">" . htmlspecialchars($displayJob, ENT_QUOTES, 'UTF-8') . "</a></li>\n      <li>Expected CSV (when ready): <a href=\"/".htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8')."\">output.csv</a></li>\n    </ul>\n    <p><a href=\"/\">Back</a></p>\n    <blockquote style=\"margin-top:24px;font-size:90%;color:#666;\">" . htmlspecialchars($response, ENT_QUOTES, 'UTF-8') . "</blockquote>\n  </div>\n</div>\n</body>\n</html>";

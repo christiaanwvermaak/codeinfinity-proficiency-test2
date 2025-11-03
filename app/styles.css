@@ -27,6 +27,28 @@ body {
   /* ensure content sits below the fixed header */
   padding-top: var(--site-header-height);
 }
+
+/* Shared page container used by generate and upload pages */
+.container {
+  font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  padding: 24px;
+  max-width: 680px;
+  margin: auto;
+}
+
+/* Code block style for CLI commands and preformatted text */
+.code-block {
+  /* slightly lighter background for improved contrast against page bg */
+  background: #0f1a27;
+  padding: 14px;
+  border-radius: 8px;
+  color: #e6f7fb;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
+  font-size: 13px;
+  border: 1px solid rgba(255,255,255,0.035);
+  box-shadow: 0 8px 30px rgba(2,6,23,0.45);
+}
 .card {
   background: linear-gradient(
     180deg,
@@ -36,7 +58,9 @@ body {
   padding: 32px;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
-  width: 420px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
 }
 h1 {
   font-size: 20px;
@@ -171,3 +195,37 @@ input[type="file"]{
   color: var(--accent);
   box-shadow: 0 4px 18px rgba(6,182,212,0.06);
 }
+
+/* Modal for upload status (moved from inline styles in upload.php) */
+.modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 9999; pointer-events: none; }
+.modal.open { display: flex; pointer-events: auto; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9998; }
+.modal-content { position: relative; background: #fff; padding: 20px; border-radius: 8px; max-width: 520px; width: 90%; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 9999; }
+.modal-close { position: absolute; right: 10px; top: 8px; border: 0; background: transparent; font-size: 20px; cursor: pointer; display: none; }
+.modal.open .modal-close { display: inline-block; }
+.modal-cancel { position: absolute; left: 12px; top: 10px; border: 0; background: rgba(255,255,255,0.06); color: #e6eef6; padding: 6px 10px; border-radius: 8px; cursor: pointer; display: none; }
+.modal.open .modal-cancel { display: inline-block; }
+
+/* percentage badge in title */
+.modal-pct { font-weight: 700; color: var(--accent); margin-left: 8px; font-size: 14px; }
+
+/* Confirm on cancel dialog overlay */
+.confirm-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 100000; }
+.confirm-overlay.open { display: flex; }
+.confirm-box { background: #04202a; color: #e6eef6; padding: 18px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); max-width: 420px; width: 90%; }
+.confirm-actions { display:flex; gap:8px; margin-top:12px; }
+.confirm-actions .btn { flex:1 }
+.modal-body { font-size: 15px; color: #222; }
+.spinner.small { width: 28px; height: 28px; border: 4px solid rgba(230,238,246,0.08); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
+.modal .loading-text { color: #071022; }
+.modal .loading-text a { color: var(--accent); }
+.modal .modal-body progress { display: block; margin-top: 8px; width: 220px; }
+
+/* disable background scroll when modal is open */
+body.modal-open { overflow: hidden; }
+
+/* Page wrapper used by upload.php */
+.page-wrap { padding-top: 18px; max-width: 720px; margin: 18px auto; display: flex; align-items: flex-start; justify-content: center; }
+
+/* Result page shown after non-AJAX import (server-rendered) */
+body.result-page { font-family: Arial, Helvetica, sans-serif; padding: 24px; max-width: 680px; margin: auto; color: inherit; background: transparent; }
